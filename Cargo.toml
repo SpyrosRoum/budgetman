@@ -1,0 +1,2 @@
+[workspace]
+members = ["budgetman_crud", "budgetman_api", "budgetman", "common"]
