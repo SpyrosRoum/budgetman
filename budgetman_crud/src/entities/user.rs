@@ -1,17 +1,23 @@
-use sea_orm::entity::prelude::*;
+use {
+    sea_query::{self, Iden},
+    serde::{Deserialize, Serialize},
+    sqlx,
+};
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "users")]
-pub struct Model {
-    #[sea_orm(primary_key, column_type = "Text")]
+#[derive(Iden)]
+pub enum UserTable {
+    #[iden = "users"]
+    Table,
+    Id,
+    Username,
+    PasswordHash,
+    Admin,
+}
+
+#[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
+pub struct UserRow {
     pub id: String,
-    #[sea_orm(unique)]
     pub username: String,
     pub password_hash: String,
     pub admin: bool,
 }
-
-#[derive(EnumIter, Debug, DeriveRelation)]
-pub enum Relation {}
-
-impl ActiveModelBehavior for ActiveModel {}

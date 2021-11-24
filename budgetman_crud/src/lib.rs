@@ -2,35 +2,81 @@ mod entities;
 
 use std::env;
 
-use {sea_orm::DatabaseConnection, sqlx::SqlitePool, uuid::Uuid};
+use {
+    anyhow::Context,
+    sea_query::{self, bind_params_sqlx_sqlite, Expr, Func, Query, SqliteQueryBuilder, Value},
+    sqlx::SqlitePool,
+    uuid::Uuid,
+};
 
-pub async fn create_db() -> Result<SqlitePool, Box<dyn std::error::Error>> {
-    let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
-    sqlx::migrate!().run(&pool).await?;
+pub use entities::user::*;
+
+pub async fn create_db() -> anyhow::Result<SqlitePool> {
+    let db_url = env::var("DATABASE_URL").context("Expected `DATABASE_URL` env variable")?;
+    let pool = SqlitePool::connect(&db_url)
+        .await
+        .context("Failed to connect to db")?;
+    sqlx::migrate!()
+        .run(&pool)
+        .await
+        .context("Failed to run migrations")?;
     Ok(pool)
 }
 
 /// Add the default admin user to the database if there are no users
-pub async fn add_default_user(db: &DatabaseConnection) -> Result<(), Box<dyn std::error::Error>> {
-    use entities::user;
-    use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
+pub async fn add_default_user(db: &SqlitePool) -> anyhow::Result<()> {
+    let (sql, values) = Query::select()
+        .from(UserTable::Table)
+        .and_where(Expr::col(UserTable::Admin).eq(true))
+        .expr(Func::count(Expr::col(UserTable::Id)))
+        .build(SqliteQueryBuilder);
+    let query = bind_params_sqlx_sqlite!(sqlx::query_scalar(&sql), values);
+    let count: u32 = query.fetch_one(db).await.context("DB error")?;
 
-    if user::Entity::find()
-        .filter(user::Column::Admin.eq(true))
-        .count(db)
-        .await
-        .unwrap()
-        == 0
-    {
-        let user = user::ActiveModel {
-            id: Set(Uuid::new_v4().to_hyphenated().to_string()),
-            username: Set(String::from("admin")),
-            password_hash: Set(common::hash_password("admin").unwrap()),
-            admin: Set(true),
-        };
-
-        user::ActiveModel::insert(user, db).await?;
+    if count == 0 {
+        let (sql, values) = Query::insert()
+            .into_table(UserTable::Table)
+            .columns([
+                UserTable::Id,
+                UserTable::Username,
+                UserTable::PasswordHash,
+                UserTable::Admin,
+            ])
+            .values_panic([
+                Uuid::new_v4().into(),
+                "admin".into(),
+                common::hash_password("admin").unwrap().into(),
+                true.into(),
+            ])
+            .build(SqliteQueryBuilder);
+        let query = bind_params_sqlx_sqlite!(sqlx::query(&sql), values);
+        query
+            .execute(db)
+            .await
+            .context("Failed to insert default admin user")?;
     }
 
     Ok(())
+}
+
+pub async fn get_user_from_username(
+    db: &SqlitePool,
+    username: &str,
+) -> anyhow::Result<Option<UserRow>> {
+    let (sql, values) = Query::select()
+        .columns([
+            UserTable::Id,
+            UserTable::Username,
+            UserTable::PasswordHash,
+            UserTable::Admin,
+        ])
+        .from(UserTable::Table)
+        .and_where(Expr::col(UserTable::Username).eq(username))
+        .build(SqliteQueryBuilder);
+    let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
+
+    Ok(query
+        .fetch_optional(db)
+        .await
+        .context("Failed to fetch user from db")?)
 }

@@ -11,6 +11,7 @@ common = { path = "../common" }
 api = { path = "../budgetman_api", package = "budgetman_api" }
 crud = { path = "../budgetman_crud", package = "budgetman_crud" }
 
+anyhow = "1"
 tokio = { version = "1", features = ["full"] }
 warp = "0.3"
 askama = { version = "0.10", features = ["with-warp"] }
