@@ -354,7 +354,6 @@ dependencies = [
  "argon2",
  "serde",
  "serde_json",
- "thiserror",
  "warp",
 ]
 
