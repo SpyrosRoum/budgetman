@@ -1,4 +1,4 @@
-mod entities;
+mod models;
 
 use std::env;
 
@@ -9,7 +9,7 @@ use {
     uuid::Uuid,
 };
 
-pub use entities::user::*;
+pub use models::user::*;
 
 pub async fn create_db() -> anyhow::Result<SqlitePool> {
     let db_url = env::var("DATABASE_URL").context("Expected `DATABASE_URL` env variable")?;
