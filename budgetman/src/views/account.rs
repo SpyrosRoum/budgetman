@@ -1,19 +1,37 @@
 use {
     askama::Template,
-    warp::{http::Uri, Filter, Rejection, Reply},
+    common::{requests::LoginRequest, with_db},
+    sqlx::SqlitePool,
+    warp::{
+        http::{header, Response, StatusCode},
+        Filter, Rejection, Reply,
+    },
 };
 
-pub(crate) fn routes() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub(crate) fn routes(
+    db: &SqlitePool,
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     let login = warp::path!("login").and(warp::get()).map(|| LogIn);
     let login_request = warp::path!("login")
         .and(warp::post())
         .and(warp::body::form())
-        .map(|req: common::LoginRequest| {
-            dbg!(&req);
-            warp::redirect(Uri::from_static("/"))
-        });
+        .and(with_db(db.clone()))
+        .and_then(handle_login);
 
     login.or(login_request)
+}
+
+async fn handle_login(req: LoginRequest, db: SqlitePool) -> Result<impl Reply, Rejection> {
+    let jwt = crud::login(req, &db).await?;
+    Ok(Response::builder()
+        .header(header::LOCATION, "/")
+        .status(StatusCode::MOVED_PERMANENTLY)
+        .header(
+            header::SET_COOKIE,
+            format!("access_token={}; HttpOnly", jwt),
+        )
+        .body("")
+        .unwrap())
 }
 
 #[derive(Template)]

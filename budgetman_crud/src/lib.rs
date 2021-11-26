@@ -1,5 +1,3 @@
-mod models;
-
 use std::env;
 
 use {
@@ -7,9 +5,16 @@ use {
     sea_query::{self, bind_params_sqlx_sqlite, Expr, Func, Query, SqliteQueryBuilder, Value},
     sqlx::SqlitePool,
     uuid::Uuid,
+    warp::http::StatusCode,
 };
 
-pub use models::user::*;
+use common::{
+    auth::{create_jwt, validate_password},
+    err_resp,
+    models::user::*,
+    requests::LoginRequest,
+    responses::ErrorResponse,
+};
 
 pub async fn create_db() -> anyhow::Result<SqlitePool> {
     let db_url = env::var("DATABASE_URL").context("Expected `DATABASE_URL` env variable")?;
@@ -45,7 +50,7 @@ pub async fn add_default_user(db: &SqlitePool) -> anyhow::Result<()> {
             .values_panic([
                 Uuid::new_v4().into(),
                 "admin".into(),
-                common::hash_password("admin").unwrap().into(),
+                common::auth::hash_password("admin").unwrap().into(),
                 true.into(),
             ])
             .build(SqliteQueryBuilder);
@@ -59,10 +64,12 @@ pub async fn add_default_user(db: &SqlitePool) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn get_user_from_username(
-    db: &SqlitePool,
-    username: &str,
-) -> anyhow::Result<Option<UserRow>> {
+pub async fn get_user_from(db: &SqlitePool, ident: &UserIdent) -> anyhow::Result<Option<UserRow>> {
+    let expr = match ident {
+        UserIdent::Id(id) => Expr::col(UserTable::Id).eq(id.as_str()),
+        UserIdent::Username(username) => Expr::col(UserTable::Username).eq(username.as_str()),
+    };
+
     let (sql, values) = Query::select()
         .columns([
             UserTable::Id,
@@ -71,7 +78,7 @@ pub async fn get_user_from_username(
             UserTable::Admin,
         ])
         .from(UserTable::Table)
-        .and_where(Expr::col(UserTable::Username).eq(username))
+        .and_where(expr)
         .build(SqliteQueryBuilder);
     let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
 
@@ -79,4 +86,24 @@ pub async fn get_user_from_username(
         .fetch_optional(db)
         .await
         .context("Failed to fetch user from db")?)
+}
+
+/// Try to validate the username and password, if successful get a jwt
+pub async fn login(req: LoginRequest, db: &SqlitePool) -> Result<String, ErrorResponse> {
+    let user = get_user_from(db, &UserIdent::Username(req.username.clone()))
+        .await
+        .map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| err_resp(StatusCode::UNAUTHORIZED, "Incorrect username or password"))?;
+
+    if !validate_password(&user.password_hash, &req.password) {
+        return Err(err_resp(
+            StatusCode::UNAUTHORIZED,
+            "Incorrect username or password",
+        ));
+    }
+
+    Ok(
+        create_jwt(&user)
+            .map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+    )
 }

@@ -1,6 +1,9 @@
+mod utils;
 mod views;
 
-use {dotenv::dotenv, warp::Filter};
+use std::env;
+
+use {anyhow::Context, dotenv::dotenv, warp::Filter};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -11,8 +14,11 @@ async fn main() -> anyhow::Result<()> {
         eprint!("Failed to add default admin user: {:#}", e);
     }
 
+    let secret = env::var("SECRET").context("Expected `SECRET` env variable")?;
+    common::set_secret(&secret);
+
     let api = api::routes(&db);
-    let views = views::routes();
+    let views = views::routes(&db);
     let admin_lte = warp::path("static").and(warp::fs::dir("static"));
 
     let routes = admin_lte.or(views).or(api);

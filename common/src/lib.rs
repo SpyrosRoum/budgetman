@@ -1,53 +1,46 @@
+//! Functions, structs, and enums that are used across two or more packages
+
+pub mod auth;
+pub mod models;
+pub mod requests;
+pub mod responses;
+
+use std::convert::Infallible;
+
 use {
-    argon2::{
-        password_hash::{
-            rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
-        },
-        Argon2,
-    },
-    serde::{Deserialize, Serialize},
-    warp::http::StatusCode,
+    jwt_simple::prelude::HS256Key,
+    once_cell::sync::OnceCell,
+    sqlx::SqlitePool,
+    warp::{http::StatusCode, Filter},
 };
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct LoginRequest {
-    pub username: String,
-    pub password: String,
+use crate::responses::ErrorResponse;
+
+static KEY: OnceCell<HS256Key> = OnceCell::new();
+
+/// Set the secrete key used for JWTs
+///
+/// # Panic
+/// Will panic if it gets called more than once
+pub fn set_secret(secret: &str) {
+    let key = HS256Key::from_bytes(secret.as_bytes());
+    KEY.set(key).expect("KEY has been set before")
 }
 
-pub fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-    Ok(argon2
-        .hash_password(password.as_bytes(), &salt)?
-        .to_string())
+/// Get the secrete key used for JWTs
+///
+/// # Panic
+/// Will panic if the key hasn't been set
+pub fn get_secret() -> &'static HS256Key {
+    KEY.get().expect("KEY has not been set")
 }
 
-pub fn validate_password(hash: &str, password: &str) -> bool {
-    let argon2 = Argon2::default();
-    let hash = PasswordHash::new(hash).expect("Invalid argon2 encoded password");
-    argon2
-        .verify_password(password.as_bytes(), &hash)
-        .map_or(false, |_| true)
+/// Helper function to create [`ErrorResponse`]s on te fly,
+/// Basically sorter version of [`ErrorResponse::new`]
+pub fn err_resp<S: Into<String>>(code: StatusCode, msg: S) -> ErrorResponse {
+    ErrorResponse::new(code, msg.into())
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct ErrorResponse {
-    code: u16,
-    message: String,
-}
-
-impl warp::reject::Reject for ErrorResponse {}
-
-impl ErrorResponse {
-    pub fn new<S: Into<String>>(code: StatusCode, msg: S) -> Self {
-        Self {
-            code: code.as_u16(),
-            message: msg.into(),
-        }
-    }
-
-    pub fn get_code(&self) -> u16 {
-        self.code
-    }
+pub fn with_db(db: SqlitePool) -> impl Filter<Extract = (SqlitePool,), Error = Infallible> + Clone {
+    warp::any().map(move || db.clone())
 }

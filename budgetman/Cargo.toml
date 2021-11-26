@@ -16,6 +16,5 @@ tokio = { version = "1", features = ["full"] }
 warp = "0.3"
 askama = { version = "0.10", features = ["with-warp"] }
 askama_warp = "0.11" # Used by askama's `with-warp` feature internally
-#serde = "1"
 dotenv = "0.15"
-sea-orm = "0.4"
+sqlx = "*"

@@ -8,26 +8,6 @@ common = { path = "../common" }
 uuid = { version = "0.8", default-features = false, features = ["serde", "v4"] }
 serde = "1"
 anyhow = "1"
-
-[dependencies.sqlx]
-version = "0.5"
-features = [
-    "sqlite",
-    "macros",
-    "uuid",
-    "runtime-tokio-rustls",
-    "migrate",
-    "all-types"
-]
-
-[dependencies.sea-query]
-version = "0.19"
-default-features = false
-features = [
-    "derive",
-    "thread-safe",
-    "backend-sqlite",
-    "sqlx-sqlite",
-    "with-uuid",
-    "serde_json"
-]
+sea-query = "*"
+sqlx = "*"
+warp = "*"
