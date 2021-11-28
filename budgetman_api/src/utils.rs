@@ -33,7 +33,7 @@ pub async fn check_token(token: Option<String>, db: SqlitePool) -> Result<UserRo
             .map_err(warp::reject::custom)?
             .id;
 
-        crud::get_user_from(&db, &UserIdent::Id(user_id))
+        crud::fetch_user_from(&db, &UserIdent::Id(user_id))
             .await
             .map_err(|e| err_resp(StatusCode::UNAUTHORIZED, e.to_string()))?
             .ok_or_else(|| err_resp(StatusCode::BAD_REQUEST, "Invalid JWT"))

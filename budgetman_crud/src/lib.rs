@@ -64,7 +64,10 @@ pub async fn add_default_user(db: &SqlitePool) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn get_user_from(db: &SqlitePool, ident: &UserIdent) -> anyhow::Result<Option<UserRow>> {
+pub async fn fetch_user_from(
+    db: &SqlitePool,
+    ident: &UserIdent,
+) -> anyhow::Result<Option<UserRow>> {
     let expr = match ident {
         UserIdent::Id(id) => Expr::col(UserTable::Id).eq(id.as_str()),
         UserIdent::Username(username) => Expr::col(UserTable::Username).eq(username.as_str()),
@@ -82,15 +85,15 @@ pub async fn get_user_from(db: &SqlitePool, ident: &UserIdent) -> anyhow::Result
         .build(SqliteQueryBuilder);
     let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
 
-    Ok(query
+    query
         .fetch_optional(db)
         .await
-        .context("Failed to fetch user from db")?)
+        .context("Failed to fetch user from db")
 }
 
 /// Try to validate the username and password, if successful get a jwt
 pub async fn login(req: LoginRequest, db: &SqlitePool) -> Result<String, ErrorResponse> {
-    let user = get_user_from(db, &UserIdent::Username(req.username.clone()))
+    let user = fetch_user_from(db, &UserIdent::Username(req.username.clone()))
         .await
         .map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| err_resp(StatusCode::UNAUTHORIZED, "Incorrect username or password"))?;
