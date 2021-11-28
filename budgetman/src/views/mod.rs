@@ -11,14 +11,12 @@ use {
     },
 };
 
-use crate::utils::require_login;
-
 pub(crate) fn routes(
     db: &SqlitePool,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     let index = warp::path::end()
         .and(warp::get())
-        .and(require_login(db.clone()))
+        .and(api::utils::require_login(db.clone()))
         .map(|u: UserRow| Index {
             username: u.username,
         });
@@ -27,35 +25,27 @@ pub(crate) fn routes(
 
     index
         .or(account_pages)
-        .or(warp::path!("500").map(|| views_404_500::View500 {
-            username: "Really not sure, could *try* to authenticate and get a username but meh"
-                .into(),
-        }))
-        .or(warp::path!("404").map(|| views_404_500::View404 {
-            username: "Really not sure, could *try* to authenticate and get a username but meh"
-                .into(),
-        }))
+        // ToDo: Try to authenticate and if successful use the user's name
+        .or(warp::path!("500").map(|| views_404_500::View500::new(None)))
+        .or(warp::path!("404").map(|| views_404_500::View404::new(None)))
         .recover(handle_rejection)
 }
 
-/// Only three things can fail:
+/// Handle rejections that can occur when creating views:
 /// 1. Authentication
 /// 2. Internal error (for example something went wrong with the db)
-/// 3 . 404
 async fn handle_rejection(r: Rejection) -> Result<impl Reply, Rejection> {
-    let uri = if let Some(e) = r.find::<ErrorResponse>() {
-        if e.get_code() == StatusCode::INTERNAL_SERVER_ERROR.as_u16() {
+    if let Some(e) = r.find::<ErrorResponse>() {
+        let uri = if e.get_code() == StatusCode::INTERNAL_SERVER_ERROR.as_u16() {
             Uri::from_static("/500")
         } else {
             Uri::from_static("/login")
-        }
-    } else if r.is_not_found() {
-        Uri::from_static("/404")
-    } else {
-        Uri::from_static("/500")
-    };
+        };
 
-    Ok(warp::redirect(uri))
+        Ok(warp::redirect(uri))
+    } else {
+        Err(r)
+    }
 }
 
 #[derive(Template)]

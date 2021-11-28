@@ -1,19 +1,33 @@
+use std::convert::Infallible;
+
 use {
+    common::{
+        err_resp,
+        models::user::{UserIdent, UserRow},
+        with_db,
+    },
     sqlx::SqlitePool,
-    common::{err_resp, models::user::{UserIdent, UserRow}, with_db},
-    warp::{http::StatusCode, Rejection, Filter}
+    warp::{
+        http::{header, StatusCode},
+        Filter, Rejection,
+    },
 };
 
-pub(crate) fn require_login(
+pub fn require_login(
     db: SqlitePool,
 ) -> impl Filter<Extract = (UserRow,), Error = Rejection> + Clone {
-    warp::header::optional("authentication")
+    warp::header(header::AUTHORIZATION.as_str())
+        .or(warp::cookie("access_token"))
+        .unify()
+        .map(Some)
+        .or_else(|_| async { Ok::<_, Infallible>((None,)) })
         .and(with_db(db))
         .and_then(check_token)
 }
 
 pub async fn check_token(token: Option<String>, db: SqlitePool) -> Result<UserRow, Rejection> {
     if let Some(token) = token {
+        let token = token.trim_start_matches("Bearer ");
         let user_id = common::auth::validate_jwt(token)
             .map_err(|e| err_resp(StatusCode::UNAUTHORIZED, e.to_string()))
             .map_err(warp::reject::custom)?

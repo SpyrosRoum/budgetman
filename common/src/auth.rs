@@ -38,8 +38,8 @@ pub fn create_jwt(user: &user::UserRow) -> Result<String, jwt_simple::Error> {
     key.authenticate(claims)
 }
 
-pub fn validate_jwt(token: String) -> Result<UserClaims, jwt_simple::Error> {
+pub fn validate_jwt(token: &str) -> Result<UserClaims, jwt_simple::Error> {
     let key = get_secret();
-    let claims = key.verify_token::<UserClaims>(&token, None)?;
+    let claims = key.verify_token::<UserClaims>(token, None)?;
     Ok(claims.custom)
 }

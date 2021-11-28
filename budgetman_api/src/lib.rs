@@ -1,13 +1,11 @@
 mod handlers;
-mod utils;
+pub mod utils;
 
 use {
-    common::{err_resp, responses::ErrorResponse},
+    common::responses::ErrorResponse,
     sqlx::SqlitePool,
     warp::{self, http::StatusCode, Filter, Rejection, Reply},
 };
-
-pub use utils::check_token;
 
 pub fn routes(db: &SqlitePool) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     // Might want to play with GraphQL later or simply do breaking changes to the api, so we use `v1` path
@@ -24,11 +22,11 @@ pub fn routes(db: &SqlitePool) -> impl Filter<Extract = impl Reply, Error = Reje
 }
 
 async fn handle_rejection(r: Rejection) -> Result<impl Reply, Rejection> {
-    let e = r.find::<ErrorResponse>().map_or_else(
-        || err_resp(StatusCode::INTERNAL_SERVER_ERROR, "Unhandled exception"),
-        |e| e.to_owned(),
-    );
-    let code = StatusCode::from_u16(e.get_code()).expect("Constructed from StatusCode");
-    let json = warp::reply::json(&e);
-    Ok(warp::reply::with_status(json, code))
+    if let Some(e) = r.find::<ErrorResponse>() {
+        let code = StatusCode::from_u16(e.get_code()).expect("Constructed from StatusCode");
+        let json = warp::reply::json(&e);
+        Ok(warp::reply::with_status(json, code))
+    } else {
+        Err(r)
+    }
 }
