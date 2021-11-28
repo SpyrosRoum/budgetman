@@ -1,11 +1,18 @@
 mod handlers;
 pub mod utils;
 
+use std::convert::Infallible;
+
 use {
-    common::responses::ErrorResponse,
+    common::{
+        models::account::{AccountType, AccountTypeQuery},
+        responses::ErrorResponse,
+    },
     sqlx::SqlitePool,
-    warp::{self, http::StatusCode, Filter, Rejection, Reply},
+    warp::{self, http::StatusCode, reject::InvalidQuery, Filter, Rejection, Reply},
 };
+
+use crate::utils::require_login;
 
 pub fn routes(db: &SqlitePool) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     // Might want to play with GraphQL later or simply do breaking changes to the api, so we use `v1` path
@@ -18,7 +25,18 @@ pub fn routes(db: &SqlitePool) -> impl Filter<Extract = impl Reply, Error = Reje
         .and(common::with_db(db.clone()))
         .and_then(handlers::handle_login);
 
-    login.recover(handle_rejection)
+    let get_accounts = base
+        .and(warp::path!("accounts"))
+        .and(warp::get())
+        .and(common::with_db(db.clone()))
+        .and(require_login(db.clone()))
+        .and(warp::query::query::<AccountTypeQuery>().or_else(|_| async {
+            // If there is no type specified, assume Any
+            Ok::<_, Infallible>((AccountTypeQuery::new(AccountType::Any),))
+        }))
+        .and_then(handlers::get_accounts);
+
+    login.or(get_accounts).recover(handle_rejection)
 }
 
 async fn handle_rejection(r: Rejection) -> Result<impl Reply, Rejection> {
