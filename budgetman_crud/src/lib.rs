@@ -47,7 +47,7 @@ pub async fn add_default_user(db: &SqlitePool) -> anyhow::Result<()> {
                 UserTable::Admin,
             ])
             .values_panic([
-                Uuid::new_v4().into(),
+                Uuid::new_v4().to_string().into(),
                 "admin".into(),
                 common::auth::hash_password("admin").unwrap().into(),
                 true.into(),
