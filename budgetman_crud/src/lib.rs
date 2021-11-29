@@ -1,3 +1,5 @@
+pub mod accounts;
+
 use std::env;
 
 use {
@@ -5,7 +7,7 @@ use {
     common::{
         auth::{create_jwt, validate_password},
         err_resp,
-        models::{account::*, user::*},
+        models::user::*,
         requests::LoginRequest,
         responses::ErrorResponse,
     },
@@ -108,79 +110,4 @@ pub async fn login(req: LoginRequest, db: &SqlitePool) -> Result<String, ErrorRe
         create_jwt(&user)
             .map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
     )
-}
-
-/// Get accounts related to the given `user_id`
-pub async fn fetch_accounts(
-    db: &SqlitePool,
-    user_id: &str,
-) -> Result<Vec<AccountRow>, ErrorResponse> {
-    let (sql, values) = Query::select()
-        .columns([
-            AccountTable::Id,
-            AccountTable::Name,
-            AccountTable::Description,
-            AccountTable::AvailableMoney,
-            AccountTable::TotalMoney,
-            AccountTable::UserId,
-            AccountTable::IsAdhoc,
-        ])
-        .from(AccountTable::Table)
-        .and_where(Expr::col(AccountTable::UserId).eq(user_id.to_owned()))
-        .build(SqliteQueryBuilder);
-    let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
-
-    query.fetch_all(db).await.map_err(|_e| {
-        err_resp(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch accounts for user {}", user_id),
-        )
-    })
-}
-
-pub async fn fetch_adhoc_accounts(
-    db: &SqlitePool,
-    user_id: &str,
-) -> Result<Vec<AdhocAccountRow>, ErrorResponse> {
-    let (sql, values) = Query::select()
-        .columns([AccountTable::Id, AccountTable::Name, AccountTable::UserId])
-        .from(AccountTable::Table)
-        .and_where(Expr::col(AccountTable::UserId).eq(user_id.to_owned()))
-        .and_where(Expr::col(AccountTable::IsAdhoc).eq(true))
-        .build(SqliteQueryBuilder);
-    let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
-
-    query.fetch_all(db).await.map_err(|_| {
-        err_resp(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch adhoc accounts for user {}", user_id),
-        )
-    })
-}
-
-pub async fn fetch_normal_accounts(
-    db: &SqlitePool,
-    user_id: &str,
-) -> Result<Vec<NormalAccountRow>, ErrorResponse> {
-    let (sql, values) = Query::select()
-        .columns([
-            AccountTable::Id,
-            AccountTable::Name,
-            AccountTable::Description,
-            AccountTable::AvailableMoney,
-            AccountTable::TotalMoney,
-            AccountTable::UserId,
-        ])
-        .from(AccountTable::Table)
-        .and_where(Expr::col(AccountTable::UserId).eq(user_id.to_owned()))
-        .and_where(Expr::col(AccountTable::IsAdhoc).eq(false))
-        .build(SqliteQueryBuilder);
-    let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
-
-    query.fetch_all(db).await.map_err(|_| {
-        err_resp(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to fetch normal accounts for user {}", user_id),
-        )
-    })
 }
