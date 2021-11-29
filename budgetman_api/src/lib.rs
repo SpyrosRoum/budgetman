@@ -48,6 +48,10 @@ async fn handle_rejection(r: Rejection) -> Result<impl Reply, Rejection> {
         let code = StatusCode::BAD_REQUEST;
         let json = serde_json::json!({ "code": code.as_u16(), "message": e.to_string() });
         Ok(warp::reply::with_status(warp::reply::json(&json), code))
+    } else if let Some(e) = r.find::<BodyDeserializeError>() {
+        let code = StatusCode::BAD_REQUEST;
+        let json = serde_json::json!({ "code": code.as_u16(), "message": e.to_string() });
+        Ok(warp::reply::with_status(warp::reply::json(&json), code))
     } else {
         Err(r)
     }
