@@ -18,3 +18,6 @@ askama = { version = "0.10", features = ["with-warp"] }
 askama_warp = "0.11" # Used by askama's `with-warp` feature internally
 dotenv = "0.15"
 sqlx = "*"
+
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
