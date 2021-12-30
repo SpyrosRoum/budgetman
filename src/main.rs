@@ -8,7 +8,7 @@ mod requests;
 mod utils;
 mod views;
 
-use std::{env, net::SocketAddr};
+use std::{env, io, net::SocketAddr};
 
 use {
     anyhow::Context,
@@ -83,6 +83,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Listening on {}", &addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .context("Failed to run axum::Server")
 }
@@ -95,4 +96,27 @@ async fn handle_404(user: Option<UserRow>) -> impl IntoResponse {
     };
 
     HtmlTemplate(view)
+}
+
+async fn shutdown_signal() {
+    #[cfg(unix)]
+    async fn terminate() -> io::Result<()> {
+        use tokio::signal::unix::SignalKind;
+
+        tokio::signal::unix::signal(SignalKind::terminate())?
+            .recv()
+            .await;
+        Ok(())
+    }
+    #[cfg(not(unix))]
+    async fn terminate() -> io::Result<()> {
+        tokio::unimplemented!("Implement this for non-unix");
+        Ok(())
+    }
+
+    tokio::select! {
+        _ = terminate() => {},
+        _ = tokio::signal::ctrl_c() => {},
+    }
+    tracing::info!("signal received, starting graceful shutdown")
 }
