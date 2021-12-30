@@ -1,4 +1,4 @@
-mod models;
+pub(crate) mod accounts;
 
 use std::env;
 
@@ -9,9 +9,14 @@ use {
     uuid::Uuid,
 };
 
-pub use models::user::*;
+use crate::{
+    models::user::*,
+    requests::LoginRequest,
+    utils::auth::{create_jwt, validate_password},
+    CommonError,
+};
 
-pub async fn create_db() -> anyhow::Result<SqlitePool> {
+pub(crate) async fn create_db() -> anyhow::Result<SqlitePool> {
     let db_url = env::var("DATABASE_URL").context("Expected `DATABASE_URL` env variable")?;
     let pool = SqlitePool::connect(&db_url)
         .await
@@ -24,7 +29,7 @@ pub async fn create_db() -> anyhow::Result<SqlitePool> {
 }
 
 /// Add the default admin user to the database if there are no users
-pub async fn add_default_user(db: &SqlitePool) -> anyhow::Result<()> {
+pub(crate) async fn add_default_user(db: &SqlitePool) -> anyhow::Result<()> {
     let (sql, values) = Query::select()
         .from(UserTable::Table)
         .and_where(Expr::col(UserTable::Admin).eq(true))
@@ -43,9 +48,9 @@ pub async fn add_default_user(db: &SqlitePool) -> anyhow::Result<()> {
                 UserTable::Admin,
             ])
             .values_panic([
-                Uuid::new_v4().into(),
+                Uuid::new_v4().to_string().into(),
                 "admin".into(),
-                common::hash_password("admin").unwrap().into(),
+                crate::utils::auth::hash_password("admin").unwrap().into(),
                 true.into(),
             ])
             .build(SqliteQueryBuilder);
@@ -59,10 +64,15 @@ pub async fn add_default_user(db: &SqlitePool) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn get_user_from_username(
+pub(crate) async fn fetch_user_from(
     db: &SqlitePool,
-    username: &str,
-) -> anyhow::Result<Option<UserRow>> {
+    ident: &UserIdent,
+) -> Result<Option<UserRow>, CommonError> {
+    let expr = match ident {
+        UserIdent::Id(id) => Expr::col(UserTable::Id).eq(id.as_str()),
+        UserIdent::Username(username) => Expr::col(UserTable::Username).eq(username.as_str()),
+    };
+
     let (sql, values) = Query::select()
         .columns([
             UserTable::Id,
@@ -71,12 +81,28 @@ pub async fn get_user_from_username(
             UserTable::Admin,
         ])
         .from(UserTable::Table)
-        .and_where(Expr::col(UserTable::Username).eq(username))
+        .and_where(expr)
         .build(SqliteQueryBuilder);
     let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
 
     Ok(query
         .fetch_optional(db)
         .await
-        .context("Failed to fetch user from db")?)
+        .map_err(|e| CommonError::Db {
+            msg: String::from("Failed to fetch user from db"),
+            source: e,
+        })?)
+}
+
+/// Try to validate the username and password, if successful get a jwt
+pub(crate) async fn login(req: LoginRequest, db: &SqlitePool) -> Result<String, CommonError> {
+    let user = fetch_user_from(db, &UserIdent::Username(req.username.clone()))
+        .await?
+        .ok_or(CommonError::WrongCredentials)?;
+
+    if !validate_password(&user.password_hash, &req.password) {
+        return Err(CommonError::WrongCredentials);
+    }
+
+    Ok(create_jwt(&user)?)
 }
