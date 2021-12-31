@@ -110,7 +110,7 @@ async fn shutdown_signal() {
     }
     #[cfg(not(unix))]
     async fn terminate() -> io::Result<()> {
-        tokio::unimplemented!("Implement this for non-unix");
+        unimplemented!("Implement this for non-unix");
         Ok(())
     }
 
