@@ -12,7 +12,8 @@ pub(crate) fn routes() -> Router {
         .route(
             "/accounts",
             get(handlers::get_accounts).post(handlers::create_account),
-        );
+        )
+        .route("/accounts/:id", get(handlers::get_specific_account));
 
     let api_v1_nest = Router::new().nest("/v1", api_v1_routes);
     Router::new().nest("/api", api_v1_nest)

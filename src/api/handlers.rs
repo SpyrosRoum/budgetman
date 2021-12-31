@@ -1,5 +1,8 @@
 use {
-    axum::{extract::Extension, http::StatusCode},
+    axum::{
+        extract::{Extension, Path},
+        http::StatusCode,
+    },
     serde_json::{json, Value},
     sqlx::SqlitePool,
 };
@@ -50,6 +53,18 @@ pub(crate) async fn get_accounts(
     };
 
     Ok(Json(accounts))
+}
+
+/// Get /api/v1/accounts/:id
+pub(crate) async fn get_specific_account(
+    Extension(db): Extension<SqlitePool>,
+    user: UserRow,
+    Path(id): Path<u32>,
+) -> Result<Json<AccountRow>, Error> {
+    let account = crud::accounts::fetch_account(&db, &user.id, id)
+        .await
+        .map_err(Error::ApiError)?;
+    Ok(Json(account))
 }
 
 /// Post /api/v1/accounts

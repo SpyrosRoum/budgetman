@@ -89,7 +89,7 @@ pub(crate) async fn fetch_user_from(
         .fetch_optional(db)
         .await
         .map_err(|e| CommonError::Db {
-            msg: String::from("Failed to fetch user from db"),
+            msg: Some("Failed to fetch user from db".into()),
             source: e,
         })?)
 }

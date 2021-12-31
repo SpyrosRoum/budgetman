@@ -21,6 +21,8 @@ pub(crate) enum Error {
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum CommonError {
+    #[error("Resource not found")]
+    NotFound,
     #[error("{0}")]
     MissingCredentials(&'static str),
     #[error(transparent)]
@@ -28,7 +30,10 @@ pub(crate) enum CommonError {
     #[error("Wrong credentials provided")]
     WrongCredentials,
     #[error("Database error")]
-    Db { msg: String, source: sqlx::Error },
+    Db {
+        msg: Option<Cow<'static, str>>,
+        source: sqlx::Error,
+    },
     #[error("{msg}")]
     Other {
         msg: Cow<'static, str>,
@@ -41,6 +46,9 @@ impl IntoResponse for Error {
         match self {
             Error::ApiError(err) => {
                 let (code, err_msg) = match err {
+                    CommonError::NotFound => {
+                        (StatusCode::NOT_FOUND, Cow::Borrowed("Resource not found"))
+                    }
                     CommonError::MissingCredentials(e) => {
                         (StatusCode::BAD_REQUEST, Cow::Borrowed(e))
                     }
@@ -52,6 +60,7 @@ impl IntoResponse for Error {
                         Cow::Borrowed("Wrong credentials provided"),
                     ),
                     CommonError::Db { msg, source } => {
+                        tracing::error!("Db Error: {:?}", source);
                         let code = if let Some(e) = source.as_database_error() {
                             if e.message().starts_with("UNIQUE constraint failed") {
                                 StatusCode::BAD_REQUEST
@@ -62,10 +71,9 @@ impl IntoResponse for Error {
                             StatusCode::INTERNAL_SERVER_ERROR
                         };
 
-                        let msg = if msg.is_empty() {
-                            Cow::Borrowed("Database error")
-                        } else {
-                            Cow::Owned(msg)
+                        let msg = match msg {
+                            Some(msg) => msg,
+                            None => Cow::Borrowed("Database error"),
                         };
 
                         (code, msg)
@@ -106,6 +114,15 @@ impl From<(StatusCode, String)> for CommonError {
         Self::Other {
             code,
             msg: Cow::Owned(msg),
+        }
+    }
+}
+
+impl From<sqlx::Error> for CommonError {
+    fn from(e: sqlx::Error) -> Self {
+        Self::Db {
+            msg: None,
+            source: e,
         }
     }
 }

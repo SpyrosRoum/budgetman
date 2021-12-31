@@ -1,9 +1,10 @@
 use {
     sea_query::{self, Iden},
     serde::{Deserialize, Serialize},
+    strum::EnumIter,
 };
 
-#[derive(Iden)]
+#[derive(Iden, EnumIter)]
 pub(crate) enum AccountTable {
     #[iden = "accounts"]
     Table,
@@ -17,6 +18,7 @@ pub(crate) enum AccountTable {
 }
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
+/// Can be any account
 pub(crate) struct AccountRow {
     pub(crate) id: i64,
     pub(crate) name: String,
@@ -28,6 +30,7 @@ pub(crate) struct AccountRow {
 }
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
+/// Specific for normal accounts
 pub(crate) struct NormalAccountRow {
     pub(crate) id: i64,
     pub(crate) name: String,
@@ -38,6 +41,7 @@ pub(crate) struct NormalAccountRow {
 }
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
+/// Specific for adhoc accounts
 pub(crate) struct AdhocAccountRow {
     pub(crate) id: i64,
     pub(crate) name: String,

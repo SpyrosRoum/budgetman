@@ -1,6 +1,7 @@
 use {
     sea_query::{bind_params_sqlx_sqlite, Expr, Query, SqliteQueryBuilder, Value},
     sqlx::SqlitePool,
+    strum::IntoEnumIterator,
 };
 
 use crate::{models::account::*, requests::AccountCreateRequest, CommonError};
@@ -26,7 +27,7 @@ pub(crate) async fn fetch_accounts(
     let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
 
     Ok(query.fetch_all(db).await.map_err(|e| CommonError::Db {
-        msg: "Failed to fetch accounts from db".to_string(),
+        msg: Some("Failed to fetch accounts from db".into()),
         source: e,
     })?)
 }
@@ -44,9 +45,25 @@ pub(crate) async fn fetch_adhoc_accounts(
     let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
 
     Ok(query.fetch_all(db).await.map_err(|e| CommonError::Db {
-        msg: "Failed to fetch adhoc accounts from db".to_string(),
+        msg: Some("Failed to fetch adhoc accounts from db".into()),
         source: e,
     })?)
+}
+
+pub(crate) async fn fetch_account(
+    db: &SqlitePool,
+    user_id: &str,
+    account_id: u32,
+) -> Result<AccountRow, CommonError> {
+    let (sql, values) = Query::select()
+        .columns(AccountTable::iter().skip(1))
+        .from(AccountTable::Table)
+        .and_where(Expr::col(AccountTable::Id).eq(account_id))
+        .and_where(Expr::col(AccountTable::UserId).eq(user_id.to_owned()))
+        .build(SqliteQueryBuilder);
+    let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
+    let account: Option<AccountRow> = query.fetch_optional(db).await?;
+    account.ok_or(CommonError::NotFound)
 }
 
 pub(crate) async fn fetch_normal_accounts(
@@ -69,7 +86,7 @@ pub(crate) async fn fetch_normal_accounts(
     let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
 
     Ok(query.fetch_all(db).await.map_err(|e| CommonError::Db {
-        msg: "Failed to fetch normal accounts from db".to_string(),
+        msg: Some("Failed to fetch normal accounts from db".into()),
         source: e,
     })?)
 }
@@ -120,7 +137,10 @@ pub(crate) async fn create_account(
             }
         };
 
-        CommonError::Db { msg, source: e }
+        CommonError::Db {
+            msg: Some(msg.into()),
+            source: e,
+        }
     })?;
 
     Ok(r.last_insert_rowid())

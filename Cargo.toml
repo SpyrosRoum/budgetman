@@ -30,6 +30,7 @@ uuid = { version = "0.8", default-features = false, features = ["serde", "v4"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
+strum = { version = "0.23", features = ["derive"] }
 [dependencies.sea-query]
 version = "0.20"
 default-features = false
