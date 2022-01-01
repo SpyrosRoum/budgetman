@@ -20,3 +20,9 @@ pub(crate) fn set_secret(secret: &str) {
 pub(crate) fn get_secret() -> &'static HS256Key {
     KEY.get().expect("KEY has not been set")
 }
+
+pub(crate) fn err_is_failed_constraint(err: &sqlx::Error) -> bool {
+    err.as_database_error()
+        .map(|e| e.message().starts_with("UNIQUE"))
+        .unwrap_or(false)
+}

@@ -1,10 +1,12 @@
+use std::borrow::Cow;
+
 use {
     sea_query::{bind_params_sqlx_sqlite, Expr, Query, SqliteQueryBuilder, Value},
     sqlx::SqlitePool,
     strum::IntoEnumIterator,
 };
 
-use crate::{models::account::*, requests::AccountCreateRequest, CommonError};
+use crate::{models::account::*, requests::AccountCreateRequest, utils, CommonError};
 
 /// Get accounts related to the given `user_id`
 pub(crate) async fn fetch_accounts(
@@ -129,18 +131,13 @@ pub(crate) async fn create_account(
 
     let query = bind_params_sqlx_sqlite!(sqlx::query(&sql), values);
     let r = query.execute(db).await.map_err(|e| {
-        let mut msg = String::from("Failed to insert account");
-        if let Some(e) = e.as_database_error() {
-            if e.message().starts_with("UNIQUE constraint failed") {
-                msg.clear();
-                msg.push_str("There already is an account with that name");
-            }
+        let msg = if utils::err_is_failed_constraint(&e) {
+            Some(Cow::Borrowed("There already is an account with that name"))
+        } else {
+            None
         };
 
-        CommonError::Db {
-            msg: Some(msg.into()),
-            source: e,
-        }
+        CommonError::Db { msg, source: e }
     })?;
 
     Ok(r.last_insert_rowid())
