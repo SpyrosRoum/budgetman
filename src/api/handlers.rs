@@ -59,7 +59,7 @@ pub(crate) async fn get_accounts(
 pub(crate) async fn get_specific_account(
     Extension(db): Extension<SqlitePool>,
     user: UserRow,
-    Path(id): Path<u32>,
+    Path(id): Path<i64>,
 ) -> Result<Json<AccountRow>, Error> {
     let account = crud::accounts::fetch_account(&db, &user.id, id)
         .await

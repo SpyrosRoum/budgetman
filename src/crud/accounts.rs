@@ -55,7 +55,7 @@ pub(crate) async fn fetch_adhoc_accounts(
 pub(crate) async fn fetch_account(
     db: &SqlitePool,
     user_id: &str,
-    account_id: u32,
+    account_id: i64,
 ) -> Result<AccountRow, CommonError> {
     let (sql, values) = Query::select()
         .columns(AccountTable::iter().skip(1))
