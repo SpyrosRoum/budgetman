@@ -10,8 +10,8 @@ use {
 use crate::{
     crud,
     extract::{Json, Query},
-    models::{account::*, user::UserRow},
-    requests::AccountCreateRequest,
+    models::{account::*, tag::TagRow, user::UserRow},
+    requests::*,
     Error,
 };
 
@@ -82,6 +82,41 @@ pub(crate) async fn create_account(
         return Err(Error::ApiError(err));
     }
     let id = crud::accounts::create_account(&db, &user.id, account)
+        .await
+        .map_err(Error::ApiError)?;
+    Ok(Json(json!({ "id": id })))
+}
+
+/// Get /api/v1/tags
+pub(crate) async fn get_tags(
+    Extension(db): Extension<SqlitePool>,
+    user: UserRow,
+) -> Result<Json<Vec<TagRow>>, Error> {
+    let tags = crud::tags::fetch_tags(&db, &user.id)
+        .await
+        .map_err(Error::ApiError)?;
+    Ok(Json(tags))
+}
+
+/// Get /api/v1/tags
+pub(crate) async fn get_specific_tag(
+    Extension(db): Extension<SqlitePool>,
+    user: UserRow,
+    Path(id): Path<i64>,
+) -> Result<Json<TagRow>, Error> {
+    let tags = crud::tags::fetch_tag(&db, &user.id, id)
+        .await
+        .map_err(Error::ApiError)?;
+    Ok(Json(tags))
+}
+
+/// Get /api/v1/tags
+pub(crate) async fn create_tag(
+    Extension(db): Extension<SqlitePool>,
+    user: UserRow,
+    Json(to_create): Json<TagCreate>,
+) -> Result<Json<Value>, Error> {
+    let id = crud::tags::create_tag(&db, user.id, to_create)
         .await
         .map_err(Error::ApiError)?;
     Ok(Json(json!({ "id": id })))
