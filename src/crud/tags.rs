@@ -18,7 +18,11 @@ pub(crate) async fn fetch_tags(db: &SqlitePool, user_id: &str) -> Result<Vec<Tag
     Ok(query.fetch_all(db).await?)
 }
 
-pub(crate) async fn fetch_tag(db: &SqlitePool, user_id: &str, id: i64) -> Result<TagRow, CommonError> {
+pub(crate) async fn fetch_tag(
+    db: &SqlitePool,
+    user_id: &str,
+    id: i64,
+) -> Result<TagRow, CommonError> {
     let (sql, values) = Query::select()
         .columns(TagTable::iter().skip(1))
         .from(TagTable::Table)
