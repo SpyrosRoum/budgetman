@@ -105,5 +105,5 @@ pub(crate) async fn login(req: LoginRequest, db: &PgPool) -> Result<String, Comm
         return Err(CommonError::WrongCredentials);
     }
 
-    Ok(create_jwt(&user)?)
+    Ok(create_jwt(user)?)
 }
