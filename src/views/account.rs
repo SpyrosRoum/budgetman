@@ -7,7 +7,7 @@ use {
         routing::get,
         Router,
     },
-    sqlx::SqlitePool,
+    sqlx::PgPool,
     tower_cookies::{Cookie, Cookies},
 };
 
@@ -22,7 +22,7 @@ pub(crate) fn routes() -> Router {
 
 // Post /login
 pub(crate) async fn handle_login(
-    Extension(db): Extension<SqlitePool>,
+    Extension(db): Extension<PgPool>,
     Form(req): Form<LoginRequest>,
     cookies: Cookies,
 ) -> Result<Redirect, Error> {

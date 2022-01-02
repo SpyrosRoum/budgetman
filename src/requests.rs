@@ -1,4 +1,7 @@
-use serde::{Deserialize, Serialize};
+use {
+    serde::{Deserialize, Serialize},
+    sqlx::types::BigDecimal,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct LoginRequest {
@@ -10,7 +13,7 @@ pub(crate) struct LoginRequest {
 pub(crate) struct AccountCreateRequest {
     pub(crate) name: String,
     pub(crate) description: Option<String>,
-    pub(crate) starting_money: Option<f64>,
+    pub(crate) starting_money: Option<BigDecimal>,
     pub(crate) is_adhoc: bool,
 }
 
@@ -18,6 +21,6 @@ pub(crate) struct AccountCreateRequest {
 pub(crate) struct TagCreate {
     pub(crate) name: String,
     pub(crate) description: Option<String>,
-    pub(crate) limit: Option<f64>,
-    pub(crate) starting_money: Option<f64>,
+    pub(crate) limit: Option<BigDecimal>,
+    pub(crate) starting_money: Option<BigDecimal>,
 }

@@ -1,7 +1,9 @@
 use {
     sea_query::{self, Iden},
     serde::{Deserialize, Serialize},
+    sqlx::types::BigDecimal,
     strum::EnumIter,
+    uuid::Uuid,
 };
 
 #[derive(Iden, EnumIter)]
@@ -18,10 +20,10 @@ pub(crate) enum TagTable {
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
 pub(crate) struct TagRow {
-    pub(crate) id: i64,
+    pub(crate) id: i32,
     pub(crate) name: String,
     pub(crate) description: Option<String>,
-    pub(crate) limit: Option<f64>,
-    pub(crate) balance: f64,
-    pub(crate) user_id: String,
+    pub(crate) limit: Option<BigDecimal>,
+    pub(crate) balance: BigDecimal,
+    pub(crate) user_id: Uuid,
 }

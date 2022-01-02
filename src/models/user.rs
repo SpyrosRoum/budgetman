@@ -6,8 +6,9 @@ use {
     headers::{authorization::Bearer, Authorization},
     sea_query::{self, Iden},
     serde::{Deserialize, Serialize},
-    sqlx::SqlitePool,
+    sqlx::PgPool,
     tower_cookies::Cookies,
+    uuid::Uuid,
 };
 
 use crate::{CommonError, Error};
@@ -24,7 +25,7 @@ pub(crate) enum UserTable {
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
 pub(crate) struct UserRow {
-    pub(crate) id: String,
+    pub(crate) id: uuid::Uuid,
     pub(crate) username: String,
     pub(crate) password_hash: String,
     pub(crate) admin: bool,
@@ -32,7 +33,7 @@ pub(crate) struct UserRow {
 
 impl UserRow {
     async fn fetch(
-        db: &SqlitePool,
+        db: &PgPool,
         cookies: Cookies,
         header: Option<TypedHeader<Authorization<Bearer>>>,
     ) -> Result<Self, CommonError> {
@@ -58,9 +59,9 @@ impl<B: Send> FromRequest<B> for UserRow {
     type Rejection = Error;
 
     async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
-        let Extension(db) = Extension::<SqlitePool>::from_request(req)
+        let Extension(db) = Extension::<PgPool>::from_request(req)
             .await
-            .expect("`SqlitePool` extension is missing");
+            .expect("`PgPool` extension is missing");
         let cookies = Cookies::from_request(req)
             .await
             .expect("`Cookies` not found");
@@ -86,11 +87,11 @@ impl<B: Send> FromRequest<B> for UserRow {
 
 /// Ways to identify a user
 pub(crate) enum UserIdent {
-    Id(String),
+    Id(Uuid),
     Username(String),
 }
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct UserClaims {
-    pub(crate) id: String,
+    pub(crate) id: Uuid,
 }

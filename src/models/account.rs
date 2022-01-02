@@ -1,6 +1,7 @@
 use {
     sea_query::{self, Iden},
     serde::{Deserialize, Serialize},
+    sqlx::types::{BigDecimal, Uuid},
     strum::EnumIter,
 };
 
@@ -20,32 +21,32 @@ pub(crate) enum AccountTable {
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
 /// Can be any account
 pub(crate) struct AccountRow {
-    pub(crate) id: i64,
+    pub(crate) id: i32,
     pub(crate) name: String,
     pub(crate) description: Option<String>,
-    pub(crate) available_money: Option<f64>,
-    pub(crate) total_money: Option<f64>,
-    pub(crate) user_id: String,
+    pub(crate) available_money: Option<BigDecimal>,
+    pub(crate) total_money: Option<BigDecimal>,
+    pub(crate) user_id: Uuid,
     pub(crate) is_adhoc: bool,
 }
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
 /// Specific for normal accounts
 pub(crate) struct NormalAccountRow {
-    pub(crate) id: i64,
+    pub(crate) id: i32,
     pub(crate) name: String,
     pub(crate) description: Option<String>,
-    pub(crate) available_money: f64,
-    pub(crate) total_money: f64,
-    pub(crate) user_id: String,
+    pub(crate) available_money: BigDecimal,
+    pub(crate) total_money: BigDecimal,
+    pub(crate) user_id: Uuid,
 }
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
 /// Specific for adhoc accounts
 pub(crate) struct AdhocAccountRow {
-    pub(crate) id: i64,
+    pub(crate) id: i32,
     pub(crate) name: String,
-    pub(crate) user_id: String,
+    pub(crate) user_id: Uuid,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

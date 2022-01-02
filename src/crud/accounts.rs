@@ -1,17 +1,18 @@
 use std::borrow::Cow;
 
 use {
-    sea_query::{bind_params_sqlx_sqlite, Expr, Query, SqliteQueryBuilder, Value},
-    sqlx::SqlitePool,
+    sea_query::{bind_params_sqlx_postgres, Expr, PostgresQueryBuilder, Query, Value},
+    sqlx::PgPool,
     strum::IntoEnumIterator,
+    uuid::Uuid,
 };
 
 use crate::{models::account::*, requests::AccountCreateRequest, utils, CommonError};
 
 /// Get accounts related to the given `user_id`
 pub(crate) async fn fetch_accounts(
-    db: &SqlitePool,
-    user_id: &str,
+    db: &PgPool,
+    user_id: &Uuid,
 ) -> Result<Vec<AccountRow>, CommonError> {
     let (sql, values) = Query::select()
         .columns([
@@ -25,8 +26,8 @@ pub(crate) async fn fetch_accounts(
         ])
         .from(AccountTable::Table)
         .and_where(Expr::col(AccountTable::UserId).eq(user_id.to_owned()))
-        .build(SqliteQueryBuilder);
-    let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
+        .build(PostgresQueryBuilder);
+    let query = bind_params_sqlx_postgres!(sqlx::query_as(&sql), values);
 
     Ok(query.fetch_all(db).await.map_err(|e| CommonError::Db {
         msg: Some("Failed to fetch accounts from db".into()),
@@ -35,16 +36,16 @@ pub(crate) async fn fetch_accounts(
 }
 
 pub(crate) async fn fetch_adhoc_accounts(
-    db: &SqlitePool,
-    user_id: &str,
+    db: &PgPool,
+    user_id: &Uuid,
 ) -> Result<Vec<AdhocAccountRow>, CommonError> {
     let (sql, values) = Query::select()
         .columns([AccountTable::Id, AccountTable::Name, AccountTable::UserId])
         .from(AccountTable::Table)
         .and_where(Expr::col(AccountTable::UserId).eq(user_id.to_owned()))
         .and_where(Expr::col(AccountTable::IsAdhoc).eq(true))
-        .build(SqliteQueryBuilder);
-    let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
+        .build(PostgresQueryBuilder);
+    let query = bind_params_sqlx_postgres!(sqlx::query_as(&sql), values);
 
     Ok(query.fetch_all(db).await.map_err(|e| CommonError::Db {
         msg: Some("Failed to fetch adhoc accounts from db".into()),
@@ -53,24 +54,24 @@ pub(crate) async fn fetch_adhoc_accounts(
 }
 
 pub(crate) async fn fetch_account(
-    db: &SqlitePool,
-    user_id: &str,
-    account_id: i64,
+    db: &PgPool,
+    user_id: &Uuid,
+    account_id: i32,
 ) -> Result<AccountRow, CommonError> {
     let (sql, values) = Query::select()
         .columns(AccountTable::iter().skip(1))
         .from(AccountTable::Table)
         .and_where(Expr::col(AccountTable::Id).eq(account_id))
         .and_where(Expr::col(AccountTable::UserId).eq(user_id.to_owned()))
-        .build(SqliteQueryBuilder);
-    let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
+        .build(PostgresQueryBuilder);
+    let query = bind_params_sqlx_postgres!(sqlx::query_as(&sql), values);
     let account: Option<AccountRow> = query.fetch_optional(db).await?;
     account.ok_or(CommonError::NotFound)
 }
 
 pub(crate) async fn fetch_normal_accounts(
-    db: &SqlitePool,
-    user_id: &str,
+    db: &PgPool,
+    user_id: &Uuid,
 ) -> Result<Vec<NormalAccountRow>, CommonError> {
     let (sql, values) = Query::select()
         .columns([
@@ -84,8 +85,8 @@ pub(crate) async fn fetch_normal_accounts(
         .from(AccountTable::Table)
         .and_where(Expr::col(AccountTable::UserId).eq(user_id.to_owned()))
         .and_where(Expr::col(AccountTable::IsAdhoc).eq(false))
-        .build(SqliteQueryBuilder);
-    let query = bind_params_sqlx_sqlite!(sqlx::query_as(&sql), values);
+        .build(PostgresQueryBuilder);
+    let query = bind_params_sqlx_postgres!(sqlx::query_as(&sql), values);
 
     Ok(query.fetch_all(db).await.map_err(|e| CommonError::Db {
         msg: Some("Failed to fetch normal accounts from db".into()),
@@ -98,15 +99,18 @@ pub(crate) async fn fetch_normal_accounts(
 ///
 /// Returns the created account's id if successful.
 pub(crate) async fn create_account(
-    db: &SqlitePool,
-    user_id: &str,
+    db: &PgPool,
+    user_id: Uuid,
     acc: AccountCreateRequest,
-) -> Result<i64, CommonError> {
+) -> Result<i32, CommonError> {
     // If the account is adhoc we want to set money to None no matter what,
     // same with description
     let (money, description) = match acc.is_adhoc {
         true => (None, None),
-        false => (Some(acc.starting_money.unwrap_or(0.0)), acc.description),
+        false => (
+            Some(acc.starting_money.unwrap_or_default()),
+            acc.description,
+        ),
     };
 
     let (sql, values) = Query::insert()
@@ -122,15 +126,16 @@ pub(crate) async fn create_account(
         .values_panic([
             acc.name.into(),
             description.into(),
-            money.into(),
+            money.clone().into(),
             money.into(),
             user_id.into(),
             acc.is_adhoc.into(),
         ])
-        .build(SqliteQueryBuilder);
+        .returning_col(AccountTable::Id)
+        .build(PostgresQueryBuilder);
 
-    let query = bind_params_sqlx_sqlite!(sqlx::query(&sql), values);
-    let r = query.execute(db).await.map_err(|e| {
+    let query = bind_params_sqlx_postgres!(sqlx::query_scalar(&sql), values);
+    let r = query.fetch_one(db).await.map_err(|e| {
         let msg = if utils::err_is_failed_constraint(&e) {
             Some(Cow::Borrowed("There already is an account with that name"))
         } else {
@@ -140,5 +145,5 @@ pub(crate) async fn create_account(
         CommonError::Db { msg, source: e }
     })?;
 
-    Ok(r.last_insert_rowid())
+    Ok(r)
 }

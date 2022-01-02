@@ -47,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
 
     let db = crud::create_db().await?;
     if let Err(e) = crud::add_default_user(&db).await {
-        eprint!("Failed to add default admin user: {:#}", e);
+        eprintln!("[WARNING]: Failed to add default admin user: {:#}", e);
     }
 
     let secret = env::var("SECRET").context("Expected `SECRET` env variable")?;
