@@ -8,7 +8,7 @@ mod requests;
 mod utils;
 mod views;
 
-use std::{env, io, net::SocketAddr};
+use std::{env, net::SocketAddr};
 
 use {
     anyhow::Context,
@@ -99,24 +99,26 @@ async fn handle_404(user: Option<UserRow>) -> impl IntoResponse {
 }
 
 async fn shutdown_signal() {
-    #[cfg(unix)]
-    async fn terminate() -> io::Result<()> {
-        use tokio::signal::unix::SignalKind;
+    use tokio::signal;
 
-        tokio::signal::unix::signal(SignalKind::terminate())?
-            .recv()
-            .await;
-        Ok(())
-    }
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
     #[cfg(not(unix))]
-    async fn terminate() -> io::Result<()> {
-        unimplemented!("Implement this for non-unix");
-        Ok(())
-    }
+    let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = terminate() => {},
-        _ = tokio::signal::ctrl_c() => {},
+        _ = terminate => {},
+        _ = ctrl_c => {},
     }
     tracing::info!("signal received, starting graceful shutdown")
 }
