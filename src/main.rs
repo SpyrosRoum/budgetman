@@ -25,7 +25,7 @@ use {
 
 pub(crate) use error::{CommonError, Error};
 
-use crate::{html_template::HtmlTemplate, models::user::UserRow};
+use crate::{html_template::HtmlTemplate, models::user::UserClaims};
 
 fn setup_logging() -> Result<(), SetGlobalDefaultError> {
     let rust_log = env::var("RUST_LOG").unwrap_or_else(|_| String::from("DEBUG,hyper=INFO"));
@@ -47,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
 
     let db = crud::create_db().await?;
     if let Err(e) = crud::add_default_user(&db).await {
-        eprint!("Failed to add default admin user: {:#}", e);
+        eprintln!("[WARNING]: Failed to add default admin user: {:#}", e);
     }
 
     let secret = env::var("SECRET").context("Expected `SECRET` env variable")?;
@@ -88,7 +88,7 @@ async fn main() -> anyhow::Result<()> {
         .context("Failed to run axum::Server")
 }
 
-async fn handle_404(user: Option<UserRow>) -> impl IntoResponse {
+async fn handle_404(user: Option<UserClaims>) -> impl IntoResponse {
     let view = if let Some(user) = user {
         views::views_404::View404::new(Some(&user.username))
     } else {

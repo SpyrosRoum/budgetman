@@ -1,0 +1,2 @@
+ALTER TABLE accounts ALTER COLUMN "name" TYPE TEXT COLLATE "ignore_case";
+ALTER TABLE tags ALTER COLUMN "name" TYPE TEXT COLLATE "ignore_case";

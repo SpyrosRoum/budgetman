@@ -4,13 +4,13 @@ use {
         http::StatusCode,
     },
     serde_json::{json, Value},
-    sqlx::SqlitePool,
+    sqlx::PgPool,
 };
 
 use crate::{
     crud,
     extract::{Json, Query},
-    models::{account::*, tag::TagRow, user::UserRow},
+    models::{account::*, tag::TagRow, user::UserClaims},
     requests::*,
     Error,
 };
@@ -18,7 +18,7 @@ use crate::{
 /// Post /api/v1/login
 pub(crate) async fn handle_login(
     Json(req): Json<crate::requests::LoginRequest>,
-    Extension(db): Extension<SqlitePool>,
+    Extension(db): Extension<PgPool>,
 ) -> Result<Json<Value>, Error> {
     let jwt = crud::login(req, &db).await.map_err(Error::ApiError)?;
     Ok(Json(json!({ "access_token": jwt })))
@@ -26,11 +26,10 @@ pub(crate) async fn handle_login(
 
 /// Get /api/v1/accounts
 pub(crate) async fn get_accounts(
-    Extension(db): Extension<SqlitePool>,
-    user: UserRow,
+    Extension(db): Extension<PgPool>,
+    user: UserClaims,
     Query(type_q): Query<AccountTypeQuery>,
 ) -> Result<Json<Value>, Error> {
-    tracing::info!("{:?}", type_q);
     let accounts = match type_q.account_type {
         AccountType::Any => {
             let accounts = crud::accounts::fetch_accounts(&db, &user.id)
@@ -57,9 +56,9 @@ pub(crate) async fn get_accounts(
 
 /// Get /api/v1/accounts/:id
 pub(crate) async fn get_specific_account(
-    Extension(db): Extension<SqlitePool>,
-    user: UserRow,
-    Path(id): Path<u32>,
+    Extension(db): Extension<PgPool>,
+    user: UserClaims,
+    Path(id): Path<i32>,
 ) -> Result<Json<AccountRow>, Error> {
     let account = crud::accounts::fetch_account(&db, &user.id, id)
         .await
@@ -69,8 +68,8 @@ pub(crate) async fn get_specific_account(
 
 /// Post /api/v1/accounts
 pub(crate) async fn create_account(
-    Extension(db): Extension<SqlitePool>,
-    user: UserRow,
+    Extension(db): Extension<PgPool>,
+    user: UserClaims,
     Json(account): Json<AccountCreateRequest>,
 ) -> Result<Json<Value>, Error> {
     if !account.is_adhoc && account.starting_money.is_none() {
@@ -81,7 +80,7 @@ pub(crate) async fn create_account(
             .into();
         return Err(Error::ApiError(err));
     }
-    let id = crud::accounts::create_account(&db, &user.id, account)
+    let id = crud::accounts::create_account(&db, user.id, account)
         .await
         .map_err(Error::ApiError)?;
     Ok(Json(json!({ "id": id })))
@@ -89,10 +88,10 @@ pub(crate) async fn create_account(
 
 /// Get /api/v1/tags
 pub(crate) async fn get_tags(
-    Extension(db): Extension<SqlitePool>,
-    user: UserRow,
+    Extension(db): Extension<PgPool>,
+    user: UserClaims,
 ) -> Result<Json<Vec<TagRow>>, Error> {
-    let tags = crud::tags::fetch_tags(&db, &user.id)
+    let tags = crud::tags::fetch_tags(&db, user.id)
         .await
         .map_err(Error::ApiError)?;
     Ok(Json(tags))
@@ -100,11 +99,11 @@ pub(crate) async fn get_tags(
 
 /// Get /api/v1/tags
 pub(crate) async fn get_specific_tag(
-    Extension(db): Extension<SqlitePool>,
-    user: UserRow,
-    Path(id): Path<i64>,
+    Extension(db): Extension<PgPool>,
+    user: UserClaims,
+    Path(id): Path<i32>,
 ) -> Result<Json<TagRow>, Error> {
-    let tags = crud::tags::fetch_tag(&db, &user.id, id)
+    let tags = crud::tags::fetch_tag(&db, user.id, id)
         .await
         .map_err(Error::ApiError)?;
     Ok(Json(tags))
@@ -112,8 +111,8 @@ pub(crate) async fn get_specific_tag(
 
 /// Get /api/v1/tags
 pub(crate) async fn create_tag(
-    Extension(db): Extension<SqlitePool>,
-    user: UserRow,
+    Extension(db): Extension<PgPool>,
+    user: UserClaims,
     Json(to_create): Json<TagCreate>,
 ) -> Result<Json<Value>, Error> {
     let id = crud::tags::create_tag(&db, user.id, to_create)

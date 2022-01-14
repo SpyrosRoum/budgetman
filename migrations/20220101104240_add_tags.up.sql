@@ -1,11 +1,9 @@
 CREATE TABLE IF NOT EXISTS tags
 (
-    id          INTEGER PRIMARY KEY NOT NULL,
-    name        TEXT                NOT NULL UNIQUE,
+    id          SERIAL PRIMARY KEY NOT NULL,
+    name        VARCHAR            NOT NULL UNIQUE,
     description TEXT,
-    "limit"     REAL,
-    balance     REAL                NOT NULL DEFAULT 0,
-    user_id     TEXT                NOT NULL,
-
-    FOREIGN KEY (user_id) REFERENCES users (id)
+    "limit"     NUMERIC,
+    balance     NUMERIC            NOT NULL DEFAULT '0.0'::numeric,
+    user_id     uuid               NOT NULL REFERENCES users (id)
 );

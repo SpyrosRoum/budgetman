@@ -31,22 +31,24 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 strum = { version = "0.23", features = ["derive"] }
+bigdecimal = { version = "0.2.2", features = ["serde"] } # This needs to be the same version as what sqlx is using to enable serde
 [dependencies.sea-query]
 version = "0.20"
 default-features = false
 features = [
     "derive",
     "thread-safe",
-    "backend-sqlite",
-    "sqlx-sqlite",
-    "with-uuid",
-    "serde_json"
+    "backend-postgres",
+    "sqlx-postgres",
+    "postgres-uuid",
+    "postgres-json",
+    "postgres-bigdecimal",
 ]
 
 [dependencies.sqlx]
 version = "0.5"
 features = [
-    "sqlite",
+    "postgres",
     "macros",
     "uuid",
     "runtime-tokio-rustls",

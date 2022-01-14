@@ -1,4 +1,5 @@
 use crate::models::user::{self, UserClaims};
+use crate::CommonError;
 use {
     argon2::{
         password_hash::{
@@ -27,16 +28,17 @@ pub(crate) fn validate_password(hash: &str, password: &str) -> bool {
         .map_or(false, |_| true)
 }
 
-pub(crate) fn create_jwt(user: &user::UserRow) -> Result<String, jwt_simple::Error> {
+pub(crate) fn create_jwt(user: user::UserRow) -> Result<String, jwt_simple::Error> {
     let key = get_secret();
     let claims = UserClaims {
-        id: user.id.to_owned(),
+        id: user.id,
+        username: user.username,
     };
     let claims = Claims::with_custom_claims(claims, Duration::from_hours(2));
     key.authenticate(claims)
 }
 
-pub(crate) fn validate_jwt(token: &str) -> Result<UserClaims, jwt_simple::Error> {
+pub(crate) fn validate_jwt(token: &str) -> Result<UserClaims, CommonError> {
     let key = get_secret();
     let claims = key.verify_token::<UserClaims>(token, None)?;
     Ok(claims.custom)

@@ -7,13 +7,13 @@ use {
     axum::{routing::get, Router},
 };
 
-use crate::{html_template::HtmlTemplate, models::user::UserRow};
+use crate::{html_template::HtmlTemplate, models::user::UserClaims};
 
 pub(crate) fn routes() -> Router {
     let views = Router::new()
         .route(
             "/",
-            get(|user: UserRow| async {
+            get(|user: UserClaims| async {
                 HtmlTemplate(Index {
                     username: user.username,
                 })
@@ -21,7 +21,7 @@ pub(crate) fn routes() -> Router {
         )
         .route(
             "/500",
-            get(|user: Option<UserRow>| async {
+            get(|user: Option<UserClaims>| async {
                 HtmlTemplate(views_500::View500::new(user.map(|u| u.username).as_deref()))
             }),
         );
